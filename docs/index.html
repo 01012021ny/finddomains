@@ -1,0 +1,704 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Abandoned Domain Finder</title>
+    <style>
+        :root {
+            --bg: #0f1117;
+            --card: #1a1d27;
+            --border: #2a2d3a;
+            --accent: #6c5ce7;
+            --accent2: #00cec9;
+            --text: #e0e0e0;
+            --text2: #8a8fa8;
+            --green: #00b894;
+            --red: #e17055;
+            --yellow: #fdcb6e;
+        }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            min-height: 100vh;
+        }
+        .container { max-width: 1100px; margin: 0 auto; padding: 20px; }
+        header { text-align: center; padding: 40px 0 30px; }
+        header h1 {
+            font-size: 2.2em;
+            background: linear-gradient(135deg, var(--accent), var(--accent2));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            margin-bottom: 8px;
+        }
+        header p { color: var(--text2); font-size: 1.1em; }
+        .tabs {
+            display: flex; gap: 4px; margin-bottom: 24px;
+            background: var(--card); border-radius: 12px; padding: 4px;
+        }
+        .tab {
+            flex: 1; padding: 12px; text-align: center; border-radius: 10px;
+            cursor: pointer; transition: all 0.2s; color: var(--text2);
+            font-weight: 500; border: none; background: none; font-size: 0.95em;
+        }
+        .tab.active { background: var(--accent); color: white; }
+        .tab:hover:not(.active) { background: var(--border); color: var(--text); }
+        .panel {
+            display: none; background: var(--card); border-radius: 16px;
+            padding: 28px; border: 1px solid var(--border);
+        }
+        .panel.active { display: block; }
+        label { display: block; margin-bottom: 6px; color: var(--text2); font-size: 0.9em; }
+        input[type="text"], textarea {
+            width: 100%; padding: 12px 16px; border: 1px solid var(--border);
+            border-radius: 10px; background: var(--bg); color: var(--text);
+            font-size: 1em; margin-bottom: 16px; outline: none; transition: border-color 0.2s;
+        }
+        input:focus, textarea:focus { border-color: var(--accent); }
+        textarea { resize: vertical; min-height: 100px; font-family: monospace; }
+        .btn {
+            display: inline-flex; align-items: center; gap: 8px;
+            padding: 12px 28px; border: none; border-radius: 10px;
+            font-size: 1em; font-weight: 600; cursor: pointer; transition: all 0.2s;
+            margin-right: 8px; margin-bottom: 8px;
+        }
+        .btn-primary {
+            background: linear-gradient(135deg, var(--accent), #a855f7); color: white;
+        }
+        .btn-primary:hover { transform: translateY(-1px); box-shadow: 0 4px 20px rgba(108,92,231,0.4); }
+        .btn-secondary { background: var(--border); color: var(--text); }
+        .btn:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+        .results { margin-top: 28px; }
+        .result-card {
+            background: var(--bg); border: 1px solid var(--border);
+            border-radius: 12px; padding: 20px; margin-bottom: 12px;
+            transition: border-color 0.2s;
+        }
+        .result-card:hover { border-color: var(--accent); }
+        .result-header {
+            display: flex; justify-content: space-between;
+            align-items: center; margin-bottom: 12px; flex-wrap: wrap; gap: 8px;
+        }
+        .domain-name { font-size: 1.2em; font-weight: 700; color: var(--accent2); }
+        .score-badge {
+            padding: 4px 14px; border-radius: 20px; font-weight: 700; font-size: 0.9em;
+        }
+        .score-high { background: rgba(0,184,148,0.15); color: var(--green); }
+        .score-medium { background: rgba(253,203,110,0.15); color: var(--yellow); }
+        .score-low { background: rgba(225,112,85,0.15); color: var(--red); }
+        .result-meta {
+            display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+            gap: 10px; margin-bottom: 12px;
+        }
+        .meta-item { font-size: 0.88em; }
+        .meta-label { color: var(--text2); }
+        .meta-value { font-weight: 600; margin-top: 2px; }
+        .tags { display: flex; flex-wrap: wrap; gap: 6px; }
+        .tag {
+            padding: 3px 10px; background: rgba(108,92,231,0.15);
+            color: var(--accent); border-radius: 6px; font-size: 0.82em; font-weight: 500;
+        }
+        .availability-check { color: var(--yellow); }
+        .loading { text-align: center; padding: 40px; color: var(--text2); }
+        .spinner {
+            width: 36px; height: 36px; border: 3px solid var(--border);
+            border-top-color: var(--accent); border-radius: 50%;
+            animation: spin 0.8s linear infinite; margin: 0 auto 16px;
+        }
+        @keyframes spin { to { transform: rotate(360deg); } }
+        .progress-bar {
+            width: 100%; height: 6px; background: var(--border);
+            border-radius: 3px; margin-bottom: 16px; overflow: hidden;
+        }
+        .progress-fill {
+            height: 100%; background: linear-gradient(90deg, var(--accent), var(--accent2));
+            border-radius: 3px; transition: width 0.3s;
+        }
+        .progress-text { font-size: 0.85em; color: var(--text2); margin-bottom: 8px; }
+        .niche-grid {
+            display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+            gap: 10px; margin-bottom: 20px;
+        }
+        .niche-card {
+            padding: 14px; background: var(--bg); border: 1px solid var(--border);
+            border-radius: 10px; cursor: pointer; transition: all 0.2s;
+            text-align: center; font-weight: 500;
+        }
+        .niche-card:hover, .niche-card.selected {
+            border-color: var(--accent); background: rgba(108,92,231,0.1);
+        }
+        .empty-state { text-align: center; padding: 40px 20px; color: var(--text2); }
+        .how-it-works {
+            background: var(--card); border: 1px solid var(--border);
+            border-radius: 16px; padding: 28px; margin-top: 30px;
+        }
+        .how-it-works h3 { margin-bottom: 16px; color: var(--accent2); }
+        .steps {
+            display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+            gap: 16px;
+        }
+        .step {
+            padding: 16px; background: var(--bg);
+            border-radius: 10px; border: 1px solid var(--border);
+        }
+        .step-num {
+            display: inline-block; width: 28px; height: 28px; line-height: 28px;
+            text-align: center; border-radius: 50%; background: var(--accent);
+            color: white; font-weight: 700; font-size: 0.85em; margin-bottom: 8px;
+        }
+        .step h4 { margin-bottom: 4px; font-size: 0.95em; }
+        .step p { font-size: 0.85em; color: var(--text2); }
+        .title-list { list-style: none; padding: 0; }
+        .title-list li { font-size: 0.85em; color: var(--text2); padding: 2px 0; }
+        .title-list li::before { content: "» "; color: var(--accent); }
+        .links { margin-top: 10px; display: flex; gap: 12px; flex-wrap: wrap; }
+        .links a { color: var(--accent); font-size: 0.85em; text-decoration: none; }
+        .links a:hover { text-decoration: underline; }
+        @media (max-width: 600px) {
+            .tabs { flex-direction: column; }
+            header h1 { font-size: 1.6em; }
+            .result-header { flex-direction: column; align-items: flex-start; }
+        }
+    </style>
+</head>
+<body>
+<div class="container">
+    <header>
+        <h1>Abandoned Domain Finder</h1>
+        <p>Находим брошенные домены с ценным контентом — прямо в браузере, без сервера</p>
+    </header>
+
+    <div class="tabs">
+        <button class="tab active" onclick="switchTab('single')">Проверить домен</button>
+        <button class="tab" onclick="switchTab('batch')">Пакетная проверка</button>
+        <button class="tab" onclick="switchTab('search')">Поиск в архиве</button>
+        <button class="tab" onclick="switchTab('niche')">Генератор по нише</button>
+    </div>
+
+    <div id="tab-single" class="panel active">
+        <label>Введите домен для проверки</label>
+        <input type="text" id="single-domain" placeholder="example.com" onkeydown="if(event.key==='Enter')checkSingle()">
+        <button class="btn btn-primary" onclick="checkSingle()" id="btn-single">Проверить</button>
+        <div id="result-single" class="results"></div>
+    </div>
+
+    <div id="tab-batch" class="panel">
+        <label>Введите домены (по одному на строку, макс. 20)</label>
+        <textarea id="batch-domains" placeholder="example1.com&#10;example2.net&#10;example3.org"></textarea>
+        <button class="btn btn-primary" onclick="checkBatch()" id="btn-batch">Проверить все</button>
+        <div id="result-batch" class="results"></div>
+    </div>
+
+    <div id="tab-search" class="panel">
+        <label>Ключевое слово для поиска доменов в Wayback Machine</label>
+        <input type="text" id="search-keyword" placeholder="shopify-store, tech-blog, saas-tool..." onkeydown="if(event.key==='Enter')searchArchive()">
+        <button class="btn btn-primary" onclick="searchArchive()" id="btn-search">Найти домены</button>
+        <button class="btn btn-secondary" id="btn-check-found" onclick="checkFoundDomains()" style="display:none;">Проверить найденные</button>
+        <div id="result-search" class="results"></div>
+    </div>
+
+    <div id="tab-niche" class="panel">
+        <label>Выберите нишу</label>
+        <div class="niche-grid" id="niche-grid"></div>
+        <button class="btn btn-primary" onclick="generateAndCheck()" id="btn-niche" disabled>Сгенерировать и проверить</button>
+        <div id="result-niche" class="results"></div>
+    </div>
+
+    <div class="how-it-works">
+        <h3>Как это работает</h3>
+        <div class="steps">
+            <div class="step">
+                <div class="step-num">1</div>
+                <h4>Находим домены</h4>
+                <p>Ищем в Wayback Machine или генерируем по нише</p>
+            </div>
+            <div class="step">
+                <div class="step-num">2</div>
+                <h4>Анализируем историю</h4>
+                <p>Считаем снапшоты, возраст, определяем тип контента</p>
+            </div>
+            <div class="step">
+                <div class="step-num">3</div>
+                <h4>Оцениваем ценность</h4>
+                <p>Скор 0-100 на основе всех метрик</p>
+            </div>
+            <div class="step">
+                <div class="step-num">4</div>
+                <h4>Покупаем и восстанавливаем</h4>
+                <p>Регистрируем домен, восстанавливаем из archive.org</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+// ============================================================
+// DATA: Niches & Site Signatures
+// ============================================================
+const NICHES = {
+    digital_products: {
+        label: "Цифровые товары",
+        keywords: [
+            "digital downloads","ebook store","online templates",
+            "printable planners","stock photos","icon packs",
+            "wordpress themes","font shop","preset store"
+        ]
+    },
+    saas: {
+        label: "SaaS / Сервисы",
+        keywords: [
+            "project management app","crm tool","email marketing",
+            "analytics dashboard","scheduling tool","invoice generator",
+            "form builder","survey tool","chatbot platform"
+        ]
+    },
+    blog: {
+        label: "Блоги",
+        keywords: [
+            "tech blog","travel blog","food blog","fitness blog",
+            "finance blog","lifestyle blog","photography blog",
+            "diy crafts blog","parenting blog","gaming blog"
+        ]
+    },
+    ecommerce: {
+        label: "Интернет-магазины",
+        keywords: [
+            "dropshipping store","print on demand","handmade jewelry",
+            "organic skincare","pet supplies","home decor shop"
+        ]
+    },
+    education: {
+        label: "Образование",
+        keywords: [
+            "online courses","coding tutorials","language learning",
+            "math tutoring","test prep","study guides"
+        ]
+    },
+    portfolio: {
+        label: "Портфолио / Фриланс",
+        keywords: [
+            "web design portfolio","freelance developer","graphic designer",
+            "creative agency","ux studio","photo portfolio"
+        ]
+    }
+};
+
+const SITE_SIGNATURES = {
+    blog: [
+        "wordpress","wp-content","blogpost","blog-post","article-content",
+        "ghost","jekyll","hugo","blogger","tumblr","medium",
+        "post-meta","entry-content","blog-header","comment-form"
+    ],
+    online_store: [
+        "add-to-cart","add_to_cart","shopify","woocommerce","magento",
+        "product-price","cart-total","checkout","buy-now","shopping-cart",
+        "bigcommerce","opencart","prestashop","ecwid"
+    ],
+    saas: [
+        "sign-up","signup","free-trial","pricing-plan","dashboard",
+        "login-form","saas","subscribe","api-key","get-started",
+        "onboarding","workspace"
+    ],
+    forum: [
+        "phpbb","vbulletin","xenforo","discourse","forum-post",
+        "thread-title","reply-count","forum-category"
+    ],
+    news_media: [
+        "breaking-news","news-article","journalist","editorial",
+        "press-release","newsroom","headline"
+    ],
+    digital_products: [
+        "digital-download","ebook","online-course","webinar",
+        "gumroad","teachable","udemy","skillshare","download-now",
+        "instant-download","license-key"
+    ]
+};
+
+const TYPE_LABELS = {
+    blog: "Блог", online_store: "Магазин", saas: "SaaS",
+    forum: "Форум", news_media: "Новости/Медиа", digital_products: "Цифровые товары"
+};
+
+// ============================================================
+// UI helpers
+// ============================================================
+let selectedNiche = '';
+let foundDomains = [];
+
+function switchTab(name) {
+    const tabs = ['single','batch','search','niche'];
+    document.querySelectorAll('.tab').forEach((t, i) => {
+        t.classList.toggle('active', tabs[i] === name);
+    });
+    document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+    document.getElementById('tab-' + name).classList.add('active');
+}
+
+function esc(text) {
+    const d = document.createElement('div');
+    d.textContent = text;
+    return d.innerHTML;
+}
+
+function showLoading(el, text) {
+    el.innerHTML = `<div class="loading"><div class="spinner"></div>${text || 'Анализируем...'}</div>`;
+}
+
+function showProgress(el, current, total, domain) {
+    el.innerHTML = `
+        <div class="progress-text">Проверяю ${current}/${total}: <strong>${esc(domain)}</strong></div>
+        <div class="progress-bar"><div class="progress-fill" style="width:${Math.round(current/total*100)}%"></div></div>
+    `;
+}
+
+// ============================================================
+// Wayback Machine CDX API (works from browser, CORS OK)
+// ============================================================
+async function getWaybackInfo(domain) {
+    const url = `https://web.archive.org/cdx/search/cdx?url=${encodeURIComponent(domain)}&output=json&fl=timestamp,statuscode&collapse=timestamp:6&limit=500`;
+    try {
+        const resp = await fetch(url);
+        if (!resp.ok) return { total: 0, first: null, last: null };
+        const data = await resp.json();
+        if (data.length <= 1) return { total: 0, first: null, last: null };
+        const rows = data.slice(1).filter(r => String(r[1]).startsWith('2'));
+        return {
+            total: rows.length,
+            first: rows.length ? rows[0][0] : null,
+            last: rows.length ? rows[rows.length - 1][0] : null
+        };
+    } catch (e) {
+        return { total: 0, first: null, last: null, error: e.message };
+    }
+}
+
+// ============================================================
+// Fetch archived page HTML from Wayback Machine
+// ============================================================
+async function getArchivedHtml(domain) {
+    try {
+        const resp = await fetch(`https://web.archive.org/web/2/${domain}`, {
+            redirect: 'follow'
+        });
+        if (resp.ok) return await resp.text();
+    } catch (e) { /* ignore */ }
+    return null;
+}
+
+// ============================================================
+// Detect site type from HTML
+// ============================================================
+function detectSiteType(html) {
+    const lower = html.toLowerCase();
+    const detected = [];
+    for (const [type, keywords] of Object.entries(SITE_SIGNATURES)) {
+        const matches = keywords.filter(kw => lower.includes(kw)).length;
+        if (matches >= 2) {
+            detected.push({
+                type,
+                label: TYPE_LABELS[type] || type,
+                confidence: Math.min(matches / keywords.length, 1.0)
+            });
+        }
+    }
+    detected.sort((a, b) => b.confidence - a.confidence);
+    return detected;
+}
+
+// ============================================================
+// Extract titles from archived HTML
+// ============================================================
+function extractTitles(html) {
+    const titles = [];
+    const parser = new DOMParser();
+    try {
+        const doc = parser.parseFromString(html, 'text/html');
+        const title = doc.querySelector('title');
+        if (title && title.textContent.trim()) titles.push(title.textContent.trim());
+        doc.querySelectorAll('h1, h2').forEach(el => {
+            const text = el.textContent.trim();
+            if (text && text.length > 3 && titles.length < 5) titles.push(text);
+        });
+    } catch (e) { /* ignore */ }
+    return titles.slice(0, 5);
+}
+
+// ============================================================
+// Score calculation
+// ============================================================
+function calcScore(report) {
+    let score = 0;
+    if (report.total_snapshots >= 100) score += 30;
+    else if (report.total_snapshots >= 50) score += 20;
+    else if (report.total_snapshots >= 10) score += 10;
+
+    if (report.archive_age_years >= 5) score += 20;
+    else if (report.archive_age_years >= 3) score += 15;
+    else if (report.archive_age_years >= 1) score += 10;
+
+    const highValue = new Set(['online_store','saas','digital_products']);
+    const medValue = new Set(['blog','news_media','forum']);
+    for (const st of report.site_types) {
+        if (highValue.has(st.type) && st.confidence > 0.3) { score += 30; break; }
+        if (medValue.has(st.type) && st.confidence > 0.3) { score += 20; break; }
+    }
+    return Math.min(score, 100);
+}
+
+// ============================================================
+// Full domain analysis (client-side)
+// ============================================================
+async function analyzeDomain(domain) {
+    domain = domain.trim().toLowerCase().replace(/^https?:\/\//, '').replace(/\/+$/, '');
+    const report = {
+        domain,
+        total_snapshots: 0,
+        first_seen: null,
+        last_seen: null,
+        archive_age_years: 0,
+        site_types: [],
+        sample_titles: [],
+        score: 0,
+        error: null
+    };
+
+    // 1. Wayback Machine history
+    const wb = await getWaybackInfo(domain);
+    if (wb.error) report.error = wb.error;
+    report.total_snapshots = wb.total;
+    report.first_seen = wb.first ? wb.first.slice(0, 8) : null;
+    report.last_seen = wb.last ? wb.last.slice(0, 8) : null;
+
+    if (wb.first && wb.last) {
+        const f = new Date(wb.first.slice(0,4)+'-'+wb.first.slice(4,6)+'-'+wb.first.slice(6,8));
+        const l = new Date(wb.last.slice(0,4)+'-'+wb.last.slice(4,6)+'-'+wb.last.slice(6,8));
+        report.archive_age_years = Math.round((l - f) / (365.25 * 86400000) * 10) / 10;
+    }
+
+    // 2. Fetch archived page & detect type
+    if (wb.total > 0) {
+        const html = await getArchivedHtml(domain);
+        if (html) {
+            report.site_types = detectSiteType(html);
+            report.sample_titles = extractTitles(html);
+        }
+    }
+
+    // 3. Score
+    report.score = calcScore(report);
+    return report;
+}
+
+// ============================================================
+// Render domain card
+// ============================================================
+function renderCard(r) {
+    const scoreClass = r.score >= 60 ? 'score-high' : r.score >= 30 ? 'score-medium' : 'score-low';
+    const fmtDate = d => d ? `${d.slice(0,4)}-${d.slice(4,6)}-${d.slice(6,8)}` : 'N/A';
+
+    const typeTags = r.site_types.map(t =>
+        `<span class="tag">${esc(t.label)} (${Math.round(t.confidence*100)}%)</span>`
+    ).join('');
+
+    const titles = r.sample_titles.map(t => `<li>${esc(t)}</li>`).join('');
+
+    return `
+    <div class="result-card">
+        <div class="result-header">
+            <span class="domain-name">${esc(r.domain)}</span>
+            <span class="score-badge ${scoreClass}">Score: ${r.score}/100</span>
+        </div>
+        <div class="result-meta">
+            <div class="meta-item">
+                <div class="meta-label">Снапшотов в архиве</div>
+                <div class="meta-value">${r.total_snapshots}</div>
+            </div>
+            <div class="meta-item">
+                <div class="meta-label">Первый / Последний</div>
+                <div class="meta-value">${fmtDate(r.first_seen)} / ${fmtDate(r.last_seen)}</div>
+            </div>
+            <div class="meta-item">
+                <div class="meta-label">Возраст в архиве</div>
+                <div class="meta-value">${r.archive_age_years} лет</div>
+            </div>
+        </div>
+        ${typeTags ? '<div class="tags" style="margin-bottom:10px">'+typeTags+'</div>' : ''}
+        ${titles ? '<ul class="title-list">'+titles+'</ul>' : ''}
+        <div class="links">
+            <a href="https://web.archive.org/web/*/${r.domain}" target="_blank">Wayback Machine</a>
+            <a href="https://www.whois.com/whois/${r.domain}" target="_blank">WHOIS</a>
+            <a href="https://www.namecheap.com/domains/registration/results/?domain=${r.domain}" target="_blank">Купить домен</a>
+        </div>
+        ${r.error ? '<div style="color:var(--red);font-size:0.85em;margin-top:6px">'+esc(r.error)+'</div>' : ''}
+    </div>`;
+}
+
+// ============================================================
+// Tab: Single domain check
+// ============================================================
+async function checkSingle() {
+    const domain = document.getElementById('single-domain').value.trim();
+    if (!domain) return;
+    const el = document.getElementById('result-single');
+    const btn = document.getElementById('btn-single');
+    btn.disabled = true;
+    showLoading(el, 'Анализируем домен...');
+    try {
+        const r = await analyzeDomain(domain);
+        el.innerHTML = renderCard(r);
+    } catch (e) {
+        el.innerHTML = `<div class="empty-state"><p>Ошибка: ${esc(e.message)}</p></div>`;
+    }
+    btn.disabled = false;
+}
+
+// ============================================================
+// Tab: Batch check
+// ============================================================
+async function checkBatch() {
+    const text = document.getElementById('batch-domains').value.trim();
+    if (!text) return;
+    const domains = text.split('\n').map(d=>d.trim()).filter(Boolean).slice(0, 20);
+    const el = document.getElementById('result-batch');
+    const btn = document.getElementById('btn-batch');
+    btn.disabled = true;
+
+    const results = [];
+    for (let i = 0; i < domains.length; i++) {
+        showProgress(el, i + 1, domains.length, domains[i]);
+        const r = await analyzeDomain(domains[i]);
+        results.push(r);
+    }
+    results.sort((a, b) => b.score - a.score);
+    el.innerHTML = results.map(renderCard).join('');
+    btn.disabled = false;
+}
+
+// ============================================================
+// Tab: Archive search
+// ============================================================
+async function searchArchive() {
+    const keyword = document.getElementById('search-keyword').value.trim();
+    if (!keyword) return;
+    const el = document.getElementById('result-search');
+    const btn = document.getElementById('btn-search');
+    btn.disabled = true;
+    showLoading(el, 'Ищем домены в Wayback Machine...');
+
+    try {
+        const url = `https://web.archive.org/cdx/search/cdx?url=*${encodeURIComponent(keyword)}*&output=json&fl=original&collapse=urlkey&limit=100`;
+        const resp = await fetch(url);
+        const data = await resp.json();
+
+        if (data.length <= 1) {
+            el.innerHTML = '<div class="empty-state"><p>Ничего не найдено. Попробуйте другое ключевое слово.</p></div>';
+            btn.disabled = false;
+            return;
+        }
+
+        const seen = new Set();
+        foundDomains = [];
+        for (const row of data.slice(1)) {
+            const m = row[0].match(/https?:\/\/([^/]+)/);
+            if (m) {
+                const d = m[1].toLowerCase().replace(/^www\./, '');
+                if (!seen.has(d) && d.includes('.')) {
+                    seen.add(d);
+                    foundDomains.push(d);
+                }
+            }
+            if (foundDomains.length >= 30) break;
+        }
+
+        if (foundDomains.length > 0) {
+            document.getElementById('btn-check-found').style.display = 'inline-flex';
+            el.innerHTML = `<div class="empty-state">
+                <p>Найдено ${foundDomains.length} доменов. Нажмите «Проверить найденные» для анализа.</p>
+                <div style="margin-top:12px;text-align:left;columns:2">${foundDomains.map(d=>`<div style="padding:3px 0;font-family:monospace;font-size:0.9em">${esc(d)}</div>`).join('')}</div>
+            </div>`;
+        } else {
+            el.innerHTML = '<div class="empty-state"><p>Домены не найдены.</p></div>';
+        }
+    } catch (e) {
+        el.innerHTML = `<div class="empty-state"><p>Ошибка: ${esc(e.message)}</p></div>`;
+    }
+    btn.disabled = false;
+}
+
+async function checkFoundDomains() {
+    if (!foundDomains.length) return;
+    const el = document.getElementById('result-search');
+    const btn = document.getElementById('btn-check-found');
+    btn.disabled = true;
+    const toCheck = foundDomains.slice(0, 15);
+    const results = [];
+    for (let i = 0; i < toCheck.length; i++) {
+        showProgress(el, i + 1, toCheck.length, toCheck[i]);
+        results.push(await analyzeDomain(toCheck[i]));
+    }
+    results.sort((a, b) => b.score - a.score);
+    el.innerHTML = results.map(renderCard).join('');
+    btn.disabled = false;
+}
+
+// ============================================================
+// Tab: Niche generator
+// ============================================================
+function initNiches() {
+    const grid = document.getElementById('niche-grid');
+    grid.innerHTML = '';
+    for (const [key, data] of Object.entries(NICHES)) {
+        const card = document.createElement('div');
+        card.className = 'niche-card';
+        card.innerHTML = `<strong>${data.label}</strong><div style="font-size:0.8em;color:var(--text2);margin-top:4px">${data.keywords.length} шаблонов</div>`;
+        card.onclick = () => {
+            selectedNiche = key;
+            document.querySelectorAll('.niche-card').forEach(c=>c.classList.remove('selected'));
+            card.classList.add('selected');
+            document.getElementById('btn-niche').disabled = false;
+        };
+        grid.appendChild(card);
+    }
+}
+
+function generateDomains(niche) {
+    const tlds = ['com','net','org','io'];
+    const domains = [];
+    for (const kw of NICHES[niche].keywords) {
+        const slug = kw.replace(/\s+/g, '').toLowerCase();
+        const slugDash = kw.replace(/\s+/g, '-').toLowerCase();
+        for (const tld of tlds) {
+            domains.push(`${slug}.${tld}`);
+            domains.push(`${slugDash}.${tld}`);
+        }
+    }
+    return domains;
+}
+
+async function generateAndCheck() {
+    if (!selectedNiche) return;
+    const el = document.getElementById('result-niche');
+    const btn = document.getElementById('btn-niche');
+    btn.disabled = true;
+
+    const domains = generateDomains(selectedNiche);
+    // Check first 15 domains
+    const toCheck = domains.slice(0, 15);
+    const results = [];
+    for (let i = 0; i < toCheck.length; i++) {
+        showProgress(el, i + 1, toCheck.length, toCheck[i]);
+        results.push(await analyzeDomain(toCheck[i]));
+    }
+    results.sort((a, b) => b.score - a.score);
+    el.innerHTML = results.map(renderCard).join('');
+    btn.disabled = false;
+}
+
+// Init
+initNiches();
+</script>
+</body>
+</html>
